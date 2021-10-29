@@ -30,6 +30,10 @@ defmodule Ockam.Messaging.Ordering.Strict.ConfirmPipe.Sender do
   After confirmation is received - next message from the queue is sent
 
   Confirmations are received on the INNER address
+
+  Options:
+
+  `receiver_route` - a route to receiver
   """
   use Ockam.AsymmetricWorker
 

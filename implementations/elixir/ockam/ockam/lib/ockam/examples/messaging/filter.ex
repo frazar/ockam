@@ -1,4 +1,11 @@
 defmodule Ockam.Examples.Messaging.Filter do
+  @moduledoc """
+  Filter worker
+
+  Randomly drops 5% of messages, forwards the rest to onward_route
+  Adds itself to return_route
+  """
+
   use Ockam.Worker
 
   alias Ockam.Message

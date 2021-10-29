@@ -53,7 +53,7 @@ defmodule Ockam.Worker do
       alias Ockam.Router
       alias Ockam.Telemetry
 
-      def create(options) when is_list(options) do
+      def create(options \\ []) when is_list(options) do
         address_prefix = Keyword.get(options, :address_prefix, address_prefix(options))
 
         options =

@@ -1,4 +1,6 @@
 defmodule Ockam.Messaging.Delivery.Tests.Filter do
+  @moduledoc false
+
   use Ockam.Worker
 
   alias Ockam.Message

@@ -44,6 +44,8 @@ defmodule Ockam.AsymmetricWorker do
 
       alias Ockam.Message
 
+      require Logger
+
       @behaviour Ockam.AsymmetricWorker
 
       @impl true

@@ -1,4 +1,9 @@
 defmodule Ockam.Messaging.Delivery.ResendPipe do
+  @moduledoc """
+  Reliable delivery pipe in which a sender will resend
+  the message if it was not confirmed by the receiver
+  """
+
   @behaviour Ockam.Messaging.Pipe
 
   @impl true
@@ -13,6 +18,11 @@ defmodule Ockam.Messaging.Delivery.ResendPipe do
 end
 
 defmodule Ockam.Messaging.Delivery.ResendPipe.Wrapper do
+  @moduledoc """
+  Resend pipe message wrapper.
+
+  Wraps message with a send reference (integer)
+  """
   @bare_schema {:struct, [ref: :uint, data: :data]}
 
   def wrap_message(message, ref) do
@@ -37,11 +47,23 @@ defmodule Ockam.Messaging.Delivery.ResendPipe.Wrapper do
 end
 
 defmodule Ockam.Messaging.Delivery.ResendPipe.Sender do
+  @moduledoc """
+  Resend pipe sender
+
+  Forwards messages to receiver with a send ref and waits for each message
+  to be conformed before sending a next one.
+  If a message is not confirmed within confirm_timeout - it's resent with a new ref.
+
+  Options:
+
+  `receiver_route` - a route to receiver
+  `confirm_timeout` - time to wait for confirm, default is 5_000
+  """
   use Ockam.AsymmetricWorker
 
-  require Logger
-
   alias Ockam.Messaging.Delivery.ResendPipe.Wrapper
+
+  require Logger
 
   @default_confirm_timeout 5_000
 
@@ -72,7 +94,6 @@ defmodule Ockam.Messaging.Delivery.ResendPipe.Sender do
   def handle_inner_message(message, state) do
     case is_valid_confirm?(message, state) do
       true ->
-        Logger.warn("confirm #{inspect(Map.get(state, :unconfirmed))}")
         confirm(state)
 
       false ->
@@ -87,12 +108,12 @@ defmodule Ockam.Messaging.Delivery.ResendPipe.Sender do
   end
 
   def resend_unconfirmed(state) do
+    ## TODO: do we want to resend with an old ref instead?
     case Map.get(state, :unconfirmed) do
       nil ->
         {:stop, :cannot_resend_unconfirmed, state}
 
       message ->
-        Logger.warn("resend #{inspect(message)}")
         clear_confirm_timeout(state)
         forward_to_receiver(message, state)
     end
@@ -176,7 +197,7 @@ defmodule Ockam.Messaging.Delivery.ResendPipe.Sender do
         true
 
       other_ref ->
-        Logger.info(
+        Logger.warn(
           "Received confirm for ref #{inspect(ref)}, current ref is #{inspect(other_ref)}"
         )
 
@@ -185,7 +206,6 @@ defmodule Ockam.Messaging.Delivery.ResendPipe.Sender do
   end
 
   def enqueue_message(message, state) do
-    Logger.warn("enqueue #{inspect(message)}")
     queue = Map.get(state, :queue, [])
     {:ok, Map.put(state, :queue, queue ++ [message])}
   end
@@ -193,12 +213,14 @@ defmodule Ockam.Messaging.Delivery.ResendPipe.Sender do
   def confirm(state) do
     queue = Map.get(state, :queue, [])
 
+    state = clear_confirm_timeout(state)
+
     case queue do
       [message | rest] ->
         forward_to_receiver(message, Map.put(state, :queue, rest))
 
       [] ->
-        {:ok, clear_confirm_timeout(state)}
+        {:ok, state}
     end
   end
 end
@@ -207,7 +229,7 @@ defmodule Ockam.Messaging.Delivery.ResendPipe.Receiver do
   @moduledoc """
   Receiver part of the resend pipe.
 
-  Received wrapped messages with confirm refs
+  Receives wrapped messages with confirm refs
   Unwraps and forwards messages
   Sends confirm messages with confirm ref to the message sender
   """

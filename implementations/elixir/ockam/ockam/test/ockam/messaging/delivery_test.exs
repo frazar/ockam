@@ -18,8 +18,7 @@ defmodule Ockam.Messaging.Delivery.Tests do
       {:ok, re_sender} =
         pipe_mod.sender().create(receiver_route: [filter, re_receiver], confirm_timeout: 50)
 
-      1..100
-      |> Enum.each(fn n ->
+      Enum.each(1..100, fn n ->
         Ockam.Router.route(%{
           onward_route: [re_sender, me],
           return_route: [me],
@@ -27,15 +26,14 @@ defmodule Ockam.Messaging.Delivery.Tests do
         })
       end)
 
-      1..100
-      |> Enum.each(fn n ->
+      Enum.each(1..100, fn n ->
         expected_payload = "HI #{n}!"
 
         receive do
           %{onward_route: [^me], payload: ^expected_payload} ->
             :ok
         after
-          10_000 ->
+          60_000 ->
             raise "Message not delivered #{n}"
         end
       end)
@@ -44,7 +42,6 @@ defmodule Ockam.Messaging.Delivery.Tests do
 
   Enum.each(delivery_pipes, fn pipe ->
     test "Pipe #{pipe} can be deduplicated with indexed pipe" do
-
       pipe_mod = unquote(pipe)
 
       index_pipe_mod = Ockam.Messaging.Ordering.Strict.IndexPipe
@@ -55,20 +52,31 @@ defmodule Ockam.Messaging.Delivery.Tests do
 
       {:ok, re_receiver} = pipe_mod.receiver().create([])
 
-      {:ok, re_sender} = pipe_mod.sender().create([receiver_route: [filter, re_receiver], confirm_timeout: 50])
+      {:ok, re_sender} =
+        pipe_mod.sender().create(receiver_route: [filter, re_receiver], confirm_timeout: 50)
 
       {:ok, ord_receiver} = index_pipe_mod.receiver().create([])
-      {:ok, ord_sender} = index_pipe_mod.sender().create(receiver_route: [re_sender, ord_receiver])
 
-      1..100 |> Enum.each(fn(n) -> Ockam.Router.route(%{onward_route: [ord_sender, me], return_route: [me], payload: "HI #{n}!"}) end)
+      {:ok, ord_sender} =
+        index_pipe_mod.sender().create(receiver_route: [re_sender, ord_receiver])
 
-      1..100 |> Enum.each(fn(n) ->
+      Enum.each(1..100, fn n ->
+        Ockam.Router.route(%{
+          onward_route: [ord_sender, me],
+          return_route: [me],
+          payload: "HI #{n}!"
+        })
+      end)
+
+      Enum.each(1..100, fn n ->
         expected_payload = "HI #{n}!"
+
         receive do
           %{onward_route: [^me], payload: ^expected_payload} ->
             :ok
-        after 10_000 ->
-          raise "Message not delivered #{n}"
+        after
+          60_000 ->
+            raise "Message not delivered #{n}"
         end
       end)
 
